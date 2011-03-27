@@ -5,6 +5,7 @@
 import sys
 import os
 import os.path
+import re
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])), 'framework', 'pym'))
 
@@ -101,11 +102,20 @@ try:
         remaining_args.remove('--%%%s' % play_env["id"])
 
     if play_command == 'test' or play_command == 'auto-test':
-        play_env["id"] = 'test'
+        # If framework-id is not a valid test-id, force it to 'test'
+        if not isTestFrameworkId( play_env["id"] ): 
+            play_env["id"] = 'test'
 
     if play_env["id"] is not '':
         print "~ framework ID is %s" % play_env["id"]
     print "~"
+    
+    # ~~~~~~~~~~~~~~~~~ Checking for disable_check_jpda
+    disable_check_jpda = False
+    if remaining_args.count('-f') == 1:
+        disable_check_jpda = True
+        remaining_args.remove('-f')
+    play_env["disable_check_jpda"] = disable_check_jpda 
 
     play_app = PlayApplication(application_path, play_env, ignoreMissing)
 

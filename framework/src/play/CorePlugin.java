@@ -35,7 +35,7 @@ public class CorePlugin extends PlayPlugin {
     public static String computeApplicationStatus(boolean json) {
         if (json) {
             JsonObject o = new JsonObject();
-            for (PlayPlugin plugin : Play.plugins) {
+            for (PlayPlugin plugin : Play.pluginCollection.getEnabledPlugins()) {
                 try {
                     JsonObject status = plugin.getJsonStatus();
                     if (status != null) {
@@ -49,8 +49,8 @@ public class CorePlugin extends PlayPlugin {
             }
             return o.toString();
         }
-        StringBuffer dump = new StringBuffer(16);
-        for (PlayPlugin plugin : Play.plugins) {
+        StringBuilder dump = new StringBuilder(16);
+        for (PlayPlugin plugin : Play.pluginCollection.getEnabledPlugins()) {
             try {
                 String status = plugin.getStatus();
                 if (status != null) {
@@ -136,8 +136,8 @@ public class CorePlugin extends PlayPlugin {
         out.println();
         out.println("Loaded plugins:");
         out.println("~~~~~~~~~~~~~~");
-        for (PlayPlugin plugin : Play.plugins) {
-            out.println(plugin.index + ":" + plugin.getClass().getName());
+        for (PlayPlugin plugin : Play.pluginCollection.getAllPlugins()) {
+            out.println(plugin.index + ":" + plugin.getClass().getName() + " [" + (Play.pluginCollection.isEnabled(plugin) ? "enabled" : "disabled") + "]");
         }
         out.println();
         out.println("Configuration:");

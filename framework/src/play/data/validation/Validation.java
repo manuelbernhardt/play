@@ -11,7 +11,6 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import net.sf.oval.configuration.annotation.AbstractAnnotationCheck;
 import play.Play;
-import play.PlayPlugin;
 import play.classloading.enhancers.LocalvariablesNamesEnhancer.LocalVariablesNamesTracer;
 import play.exceptions.UnexpectedException;
 
@@ -84,7 +83,7 @@ public class Validation {
      */
     public static Error error(String field) {
         for (Error error : current.get().errors) {
-            if (error.key.equals(field)) {
+            if (error.key!=null && error.key.equals(field)) {
                 return error;
             }
         }
@@ -98,7 +97,7 @@ public class Validation {
     public static List<Error> errors(String field) {
         List<Error> errors = new ArrayList<Error>();
         for (Error error : current.get().errors) {
-            if (error.key.equals(field)) {
+            if (error.key!=null && error.key.equals(field)) {
                 errors.add(error);
             }
         }
@@ -460,12 +459,6 @@ public class Validation {
     }
 
     public static Object willBeValidated(Object value) {
-        for (PlayPlugin plugin : Play.plugins) {
-            Object newValue = plugin.willBeValidated(value);
-            if (newValue != null) {
-                return newValue;
-            }
-        }
-        return value;
+        return Play.pluginCollection.willBeValidated(value);
     }
 }

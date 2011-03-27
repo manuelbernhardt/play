@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
 import java.lang.instrument.ClassDefinition;
-import java.lang.instrument.UnmodifiableClassException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.security.AllPermission;
@@ -24,9 +23,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import play.Logger;
 import play.Play;
-import play.PlayPlugin;
+import play.classloading.hash.ClassStateHashCreator;
 import play.vfs.VirtualFile;
 import play.cache.Cache;
 import play.classloading.ApplicationClasses.ApplicationClass;
@@ -38,6 +38,15 @@ import play.libs.IO;
  * Load the classes from the application Java sources files.
  */
 public class ApplicationClassloader extends ClassLoader {
+
+
+    private final ClassStateHashCreator classStateHashCreator = new ClassStateHashCreator();
+
+    /**
+     * A representation of the current state of the ApplicationClassloader.
+     * It gets a new value each time the state of the classloader changes.
+     */
+    public ApplicationClassloaderState currentState = new ApplicationClassloaderState();
 
     /**
      * This protection domain applies to all loaded classes.
@@ -287,15 +296,14 @@ public class ApplicationClassloader extends ClassLoader {
         Set<ApplicationClass> modifiedWithDependencies = new HashSet<ApplicationClass>();
         modifiedWithDependencies.addAll(modifieds);
         if (modifieds.size() > 0) {
-            for (PlayPlugin plugin : Play.plugins) {
-                modifiedWithDependencies.addAll(plugin.onClassesChange(modifieds));
-            }
+            modifiedWithDependencies.addAll(Play.pluginCollection.onClassesChange(modifieds));
         }
         List<ClassDefinition> newDefinitions = new ArrayList<ClassDefinition>();
         boolean dirtySig = false;
         for (ApplicationClass applicationClass : modifiedWithDependencies) {
             if (applicationClass.compile() == null) {
                 Play.classes.classes.remove(applicationClass.name);
+                currentState = new ApplicationClassloaderState();//show others that we have changed..
             } else {
                 int sigChecksum = applicationClass.sigChecksum;
                 applicationClass.enhance();
@@ -304,6 +312,7 @@ public class ApplicationClassloader extends ClassLoader {
                 }
                 BytecodeCache.cacheBytecode(applicationClass.enhancedByteCode, applicationClass.name, applicationClass.javaSource);
                 newDefinitions.add(new ClassDefinition(applicationClass.javaClass, applicationClass.enhancedByteCode));
+                currentState = new ApplicationClassloaderState();//show others that we have changed..
             }
         }
         if (newDefinitions.size() > 0) {
@@ -322,6 +331,7 @@ public class ApplicationClassloader extends ClassLoader {
         if (dirtySig) {
             throw new RuntimeException("Signature change !");
         }
+
         // Now check if there is new classes or removed classes
         int hash = computePathHash();
         if (hash != this.pathHash) {
@@ -329,9 +339,11 @@ public class ApplicationClassloader extends ClassLoader {
             for (ApplicationClass applicationClass : Play.classes.all()) {
                 if (!applicationClass.javaFile.exists()) {
                     Play.classes.classes.remove(applicationClass.name);
+                    currentState = new ApplicationClassloaderState();//show others that we have changed..
                 }
                 if (applicationClass.name.contains("$")) {
                     Play.classes.classes.remove(applicationClass.name);
+                    currentState = new ApplicationClassloaderState();//show others that we have changed..
                     // Ok we have to remove all classes from the same file ...
                     VirtualFile vf = applicationClass.javaFile;
                     for (ApplicationClass ac : Play.classes.all()) {
@@ -350,30 +362,7 @@ public class ApplicationClassloader extends ClassLoader {
     int pathHash = 0;
 
     int computePathHash() {
-        StringBuffer buf = new StringBuffer();
-        for (VirtualFile virtualFile : Play.javaPath) {
-            scan(buf, virtualFile);
-        }
-        return buf.toString().hashCode();
-    }
-
-    void scan(StringBuffer buf, VirtualFile current) {
-        if (!current.isDirectory()) {
-            if (current.getName().endsWith(".java")) {
-                Matcher matcher = Pattern.compile("\\s+class\\s([a-zA-Z0-9_]+)\\s+").matcher(current.contentAsString());
-                buf.append(current.getName());
-                buf.append("(");
-                while (matcher.find()) {
-                    buf.append(matcher.group(1));
-                    buf.append(",");
-                }
-                buf.append(")");
-            }
-        } else if (!current.getName().startsWith(".")) {
-            for (VirtualFile virtualFile : current.list()) {
-                scan(buf, virtualFile);
-            }
-        }
+        return classStateHashCreator.computePathHash(Play.javaPath);
     }
 
     /**
@@ -401,16 +390,15 @@ public class ApplicationClassloader extends ClassLoader {
                 List<ApplicationClass> all = new ArrayList<ApplicationClass>();
 
                 // Let's plugins play
-                for (PlayPlugin plugin : Play.plugins) {
-                    plugin.compileAll(all);
-                }
+                Play.pluginCollection.compileAll(all);
 
                 for (VirtualFile virtualFile : Play.javaPath) {
                     all.addAll(getAllClasses(virtualFile));
                 }
                 List<String> classNames = new ArrayList<String>();
                 for (int i = 0; i < all.size(); i++) {
-                    if (all.get(i) != null && !all.get(i).compiled) {
+                	ApplicationClass applicationClass = all.get(i);
+                    if (applicationClass != null && !applicationClass.compiled && applicationClass.isClass()) {
                         classNames.add(all.get(i).name);
                     }
                 }
@@ -544,4 +532,5 @@ public class ApplicationClassloader extends ClassLoader {
     public String toString() {
         return "(play) " + (allClasses == null ? "" : allClasses.toString());
     }
+
 }

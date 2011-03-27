@@ -4,6 +4,9 @@ import re
 import shutil
 import socket
 
+from play.utils import *
+
+
 class ModuleNotFound(Exception):
     def __init__(self, value):
         self.value = value
@@ -26,14 +29,20 @@ class PlayApplication:
         else:
             self.conf = None
         self.play_env = env
-        self.jpda_port = self.readConf('jpda_port')
+        self.jpda_port = self.readConf('jpda.port')
         self.ignoreMissingModules = ignoreMissingModules
+
+
 
     # ~~~~~~~~~~~~~~~~~~~~~~ Configuration File
 
     def check(self):
-        if not os.path.exists(os.path.join(self.path, 'conf', 'routes')):
-            print "~ Oops. %s does not seem to host a valid application" % os.path.normpath(self.path)
+        try:
+            assert os.path.exists(os.path.join(self.path, 'conf', 'routes'))
+            assert os.path.exists(os.path.join(self.path, 'conf', 'application.conf'))
+        except AssertionError:
+            print "~ Oops. conf/routes or conf/application.conf missing."
+            print "~ %s does not seem to host a valid application." % os.path.normpath(self.path)
             print "~"
             sys.exit(-1)
 
@@ -73,9 +82,9 @@ class PlayApplication:
                     modules.append(mf)
                 else:
                     modules.append(open(mf, 'r').read().strip())
-        if self.play_env["id"] == 'test':
+        if isTestFrameworkId( self.play_env["id"] ):
             modules.append(os.path.normpath(os.path.join(self.play_env["basedir"], 'modules/testrunner')))
-        return modules
+        return set(modules) # Ensure we don't have duplicates
 
     def module_names(self):
         return map(lambda x: x[7:],self.conf.getAllKeys("module."))
@@ -96,7 +105,7 @@ class PlayApplication:
                 print 'Module not found %s' % e
                 sys.exit(-1)
 
-            if play_env["id"] == 'test':
+            if isTestFrameworkId(play_env["id"]):
                 modules.append(os.path.normpath(os.path.join(play_env["basedir"], 'modules/testrunner')))
 
     def override(self, f, t):
@@ -228,6 +237,12 @@ class PlayApplication:
             args += ["--https.port=%s" % self.play_env['https.port']]
             
         java_args.append('-Dfile.encoding=utf-8')
+
+        if self.readConf('application.mode') == 'dev':
+            if not self.play_env["disable_check_jpda"]: self.check_jpda()
+            java_args.append('-Xdebug')
+            java_args.append('-Xrunjdwp:transport=dt_socket,address=%s,server=y,suspend=n' % self.jpda_port)
+            java_args.append('-Dplay.debug=yes')
         
         java_cmd = [self.java_path(), '-javaagent:%s' % self.agent_path()] + java_args + ['-classpath', cp_args, '-Dapplication.path=%s' % self.path, '-Dplay.id=%s' % self.play_env["id"], className] + args
         return java_cmd

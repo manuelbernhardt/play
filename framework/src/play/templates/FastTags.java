@@ -64,7 +64,7 @@ public class FastTags {
     public static void _option(Map<?, ?> args, Closure body, PrintWriter out, ExecutableTemplate template, int fromLine) {
         Object value = args.get("arg");
         Object selectedValue = TagContext.parent("select").data.get("selected");
-        boolean selected = selectedValue != null && value != null && selectedValue.equals(value);
+        boolean selected = selectedValue != null && value != null && (selectedValue.toString()).equals(value.toString());
         out.print("<option value=\"" + (value == null ? "" : value) + "\" " + (selected ? "selected=\"selected\"" : "") + "" + serialize(args, "selected", "value") + ">");
         out.println(JavaExtensions.toString(body));
         out.print("</option>");
@@ -336,7 +336,7 @@ public class FastTags {
             Map<String, Object> newArgs = new HashMap<String, Object>();
             newArgs.putAll(template.getBinding().getVariables());
             newArgs.put("_isInclude", true);
-            t.render(newArgs);
+            t.internalRender(newArgs);
         } catch (TemplateNotFoundException e) {
             throw new TemplateNotFoundException(e.getPath(), template.template, fromLine);
         }
@@ -362,7 +362,7 @@ public class FastTags {
             Map<String, Object> newArgs = new HashMap<String, Object>();
             newArgs.putAll((Map<? extends String, ? extends Object>) args);
             newArgs.put("_isInclude", true);
-            out.println(t.render(newArgs));
+            out.println(t.internalRender(newArgs));
         } catch (TemplateNotFoundException e) {
             throw new TemplateNotFoundException(e.getPath(), template.template, fromLine);
         }

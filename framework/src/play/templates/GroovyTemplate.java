@@ -6,6 +6,7 @@ import groovy.lang.Binding;
 import groovy.lang.Closure;
 import groovy.lang.GroovyClassLoader;
 import groovy.lang.GroovyObjectSupport;
+import groovy.lang.GroovyShell;
 import groovy.lang.MissingPropertyException;
 import groovy.lang.Script;
 import java.io.File;
@@ -58,6 +59,10 @@ import play.utils.HTML;
  * A template
  */
 public class GroovyTemplate extends BaseTemplate {
+
+    static {
+        new GroovyShell().evaluate("java.lang.String.metaClass.if = { condition -> if(condition) delegate; else '' }");
+    }
 
     public GroovyTemplate(String name, String source) {
         super(name, source);
@@ -176,7 +181,7 @@ public class GroovyTemplate extends BaseTemplate {
         compiledTemplateName = compiledTemplate.getName();
     }
 
-    public String render(Map<String, Object> args) {
+    protected String internalRender(Map<String, Object> args) {
         compile();
         Binding binding = new Binding(args);
         binding.setVariable("play", new Play());
@@ -184,7 +189,15 @@ public class GroovyTemplate extends BaseTemplate {
         binding.setVariable("lang", Lang.get());
         StringWriter writer = null;
         Boolean applyLayouts = false;
+
+        // must check if this is the first template being rendered..
+        // If this template is called from inside another template,
+        // then args("out") have already been initialized
+
         if (!args.containsKey("out")) {
+            // This is the first template being rendered.
+            // We have to set up the PrintWriter that this (and all sub-templates) are going
+            // to write the output to..
             applyLayouts = true;
             layout.set(null);
             writer = new StringWriter();
@@ -234,7 +247,7 @@ public class GroovyTemplate extends BaseTemplate {
             Map<String, Object> layoutArgs = new HashMap<String, Object>(args);
             layoutArgs.remove("out");
             layoutArgs.put("_isLayout", true);
-            String layoutR = layout.get().render(layoutArgs);
+            String layoutR = layout.get().internalRender(layoutArgs);
             return layoutR.replace("____%LAYOUT%____", writer.toString().trim());
         }
         if (writer != null) {
@@ -246,20 +259,25 @@ public class GroovyTemplate extends BaseTemplate {
     Throwable cleanStackTrace(Throwable e) {
         List<StackTraceElement> cleanTrace = new ArrayList<StackTraceElement>();
         for (StackTraceElement se : e.getStackTrace()) {
+            //Here we are parsing the classname to find the file on disk the template was generated from.
+            //See GroovyTemplateCompiler.head() for more info.
             if (se.getClassName().startsWith("Template_")) {
                 String tn = se.getClassName().substring(9);
                 if (tn.indexOf("$") > -1) {
                     tn = tn.substring(0, tn.indexOf("$"));
                 }
-                Integer line = TemplateLoader.templates.get(tn).linesMatrix.get(se.getLineNumber());
-                if (line != null) {
-                    String ext = "";
-                    if (tn.indexOf(".") > -1) {
-                        ext = tn.substring(tn.indexOf(".") + 1);
-                        tn = tn.substring(0, tn.indexOf("."));
+                BaseTemplate template = TemplateLoader.templates.get(tn);
+                if( template != null ) {
+                    Integer line = template.linesMatrix.get(se.getLineNumber());
+                    if (line != null) {
+                        String ext = "";
+                        if (tn.indexOf(".") > -1) {
+                            ext = tn.substring(tn.indexOf(".") + 1);
+                            tn = tn.substring(0, tn.indexOf("."));
+                        }
+                        StackTraceElement nse = new StackTraceElement(TemplateLoader.templates.get(tn).name, ext, "line", line);
+                        cleanTrace.add(nse);
                     }
-                    StackTraceElement nse = new StackTraceElement(TemplateLoader.templates.get(tn).name, ext, "line", line);
-                    cleanTrace.add(nse);
                 }
             }
             if (!se.getClassName().startsWith("org.codehaus.groovy.") && !se.getClassName().startsWith("groovy.") && !se.getClassName().startsWith("sun.reflect.") && !se.getClassName().startsWith("java.lang.reflect.") && !se.getClassName().startsWith("Template_")) {
@@ -329,7 +347,7 @@ public class GroovyTemplate extends BaseTemplate {
             }
             args.put("_body", body);
             try {
-                tagTemplate.render(args);
+                tagTemplate.internalRender(args);
             } catch (TagInternalException e) {
                 throw new TemplateExecutionException(template, fromLine, e.getMessage(), template.cleanStackTrace(e));
             } catch (TemplateNotFoundException e) {
@@ -387,6 +405,7 @@ public class GroovyTemplate extends BaseTemplate {
             }
 
             @Override
+            @SuppressWarnings("unchecked")
             public Object invokeMethod(String name, Object param) {
                 try {
                     if (controller == null) {
@@ -425,7 +444,7 @@ public class GroovyTemplate extends BaseTemplate {
                         if (absolute) {
                             def.absolute();
                         }
-                        if (template.template.name.endsWith(".html") || template.template.name.endsWith(".xml")) {
+                        if (template.template.name.endsWith(".xml")) {
                             def.url = def.url.replace("&", "&amp;");
                         }
                         return def;

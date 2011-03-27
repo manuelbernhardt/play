@@ -15,7 +15,6 @@ import org.joda.time.DateTime;
 
 import play.Logger;
 import play.Play;
-import play.PlayPlugin;
 import play.data.Upload;
 import play.data.binding.types.*;
 import play.data.validation.Validation;
@@ -71,7 +70,6 @@ public class Binder {
             Logger.trace("bindInternal: profile [" + Utils.join(profiles, ",") + "]");
             // Let see if we have a BindAs annotation and a separator. If so, we need to split the values
             // Look up for the BindAs annotation. Extract the profile if there is any.
-            // TODO: Move me somewhere else?
             if (annotations != null) {
                 for (Annotation annotation : annotations) {
                     if ((clazz.isArray() || Collection.class.isAssignableFrom(clazz)) && value != null && value.length > 0 && annotation.annotationType().equals(As.class)) {
@@ -172,12 +170,12 @@ public class Binder {
                 if (clazz.isInterface()) {
                     if (clazz.equals(List.class)) {
                         clazz = ArrayList.class;
-                    }
-                    if (clazz.equals(Set.class)) {
+                    } else if (clazz.equals(Set.class)) {
                         clazz = HashSet.class;
-                    }
-                    if (clazz.equals(SortedSet.class)) {
+                    } else if (clazz.equals(SortedSet.class)) {
                         clazz = TreeSet.class;
+                    } else {
+                        clazz = ArrayList.class;
                     }
                 }
                 Collection r = (Collection) clazz.newInstance();
@@ -265,10 +263,7 @@ public class Binder {
     }
 
     private static String escape(String s) {
-        s = s.replace(".", "\\.");
-        s = s.replace("[", "\\[");
-        s = s.replace("]", "\\]");
-        return s;
+        return s.replace(".", "\\.").replace("[", "\\[").replace("]", "\\]");
     }
 
     public static boolean contains(String[] profiles, String[] localProfiles) {
@@ -290,12 +285,11 @@ public class Binder {
     }
 
     public static Object bind(Object o, String name, Map<String, String[]> params) {
-        for (PlayPlugin plugin : Play.plugins) {
-            Object result = plugin.bind(name, o, params);
-            if (result != null) {
-                return result;
-            }
+        Object result = Play.pluginCollection.bind(name, o, params);
+        if (result != null) {
+            return result;
         }
+        
         try {
             return new BeanWrapper(o.getClass()).bind(name, null, params, "", o, null);
         } catch (Exception e) {
@@ -311,13 +305,10 @@ public class Binder {
     public static Object bind(String name, Class<?> clazz, Type type, Annotation[] annotations, Map<String, String[]> params, Object o, Method method, int parameterIndex) {
         Logger.trace("bind: name [" + name + "] annotation [" + Utils.join(annotations, " ") + "] ");
 
-        Object result = null;
         // Let a chance to plugins to bind this object
-        for (PlayPlugin plugin : Play.plugins) {
-            result = plugin.bind(name, clazz, type, annotations, params);
-            if (result != null) {
-                return result;
-            }
+        Object result = Play.pluginCollection.bind(name, clazz, type, annotations, params);
+        if (result != null) {
+            return result;
         }
         String[] profiles = null;
         if (annotations != null) {
@@ -408,22 +399,22 @@ public class Binder {
             }
         }
 
-        // custom types
-        for (Class<?> c : supportedTypes.keySet()) {
-            Logger.trace("directBind: value [" + value + "] c [" + c + "] Class [" + clazz + "]");
-            if (c.isAssignableFrom(clazz)) {
-                Logger.trace("directBind: isAssignableFrom is true");
-                return supportedTypes.get(c).bind(name, annotations, value, clazz, type);
-            }
-        }
-
-        // application custom types
+        // application custom types have higher priority
         for (Class<TypeBinder<?>> c : Play.classloader.getAssignableClasses(TypeBinder.class)) {
             if (c.isAnnotationPresent(Global.class)) {
                 Class<?> forType = (Class) ((ParameterizedType) c.getGenericInterfaces()[0]).getActualTypeArguments()[0];
                 if (forType.isAssignableFrom(clazz)) {
                     return c.newInstance().bind(name, annotations, value, clazz, type);
                 }
+            }
+        }
+
+         // custom types
+        for (Class<?> c : supportedTypes.keySet()) {
+            Logger.trace("directBind: value [" + value + "] c [" + c + "] Class [" + clazz + "]");
+            if (c.isAssignableFrom(clazz)) {
+                Logger.trace("directBind: isAssignableFrom is true");
+                return supportedTypes.get(c).bind(name, annotations, value, clazz, type);
             }
         }
 
@@ -434,10 +425,7 @@ public class Binder {
 
         // Enums
         if (Enum.class.isAssignableFrom(clazz)) {
-            if (nullOrEmpty) {
-                return null;
-            }
-            return Enum.valueOf((Class<Enum>)clazz, value);
+            return nullOrEmpty ? null : Enum.valueOf((Class<Enum>)clazz, value);
         }
 
         // int or Integer binding
@@ -496,11 +484,7 @@ public class Binder {
 
         // BigDecimal binding
         if (clazz.equals(BigDecimal.class)) {
-            if (nullOrEmpty) {
-                return null;
-            }
-
-            return new BigDecimal(value);
+            return nullOrEmpty ? null : new BigDecimal(value);
         }
 
         // boolean or Boolean binding

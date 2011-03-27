@@ -89,7 +89,7 @@ def new(app, args, env, cmdloader=None):
         application_name = raw_input("~ What is the application name? [%s] " % os.path.basename(app.path))
     if application_name == "":
         application_name = os.path.basename(app.path)
-    shutil.copytree(os.path.join(env["basedir"], 'resources/application-skel'), app.path)
+    copy_directory(os.path.join(env["basedir"], 'resources/application-skel'), app.path)
     os.mkdir(os.path.join(app.path, 'app/models'))
     os.mkdir(os.path.join(app.path, 'lib'))
     app.check()
@@ -121,19 +121,10 @@ def new(app, args, env, cmdloader=None):
 
 def run(app, args):
     app.check()
-    disable_check_jpda = False
-    if args.count('-f') == 1:
-        disable_check_jpda = True
-        args.remove('-f')
-
+    
     print "~ Ctrl+C to stop"
     print "~ "
     java_cmd = app.java_cmd(args)
-    if app.readConf('application.mode') == 'dev':
-        if not disable_check_jpda: app.check_jpda()
-        java_cmd.insert(2, '-Xdebug')
-        java_cmd.insert(2, '-Xrunjdwp:transport=dt_socket,address=%s,server=y,suspend=n' % app.jpda_port)
-        java_cmd.insert(2, '-Dplay.debug=yes')
     try:
         subprocess.call(java_cmd, env=os.environ)
     except OSError:
@@ -163,17 +154,11 @@ def show_modules(app, args):
 
 def test(app, args):
     app.check()
-    disable_check_jpda = False
-    if args.count('-f') == 1:
-        disable_check_jpda = True
     java_cmd = app.java_cmd(args)
     print "~ Running in test mode"
     print "~ Ctrl+C to stop"
     print "~ "
-    app.check_jpda()
-    java_cmd.insert(2, '-Xdebug')
-    java_cmd.insert(2, '-Xrunjdwp:transport=dt_socket,address=%s,server=y,suspend=n' % app.jpda_port)
-    java_cmd.insert(2, '-Dplay.debug=yes')
+
     try:
         subprocess.call(java_cmd, env=os.environ)
     except OSError:

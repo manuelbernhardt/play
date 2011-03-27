@@ -52,7 +52,6 @@ import play.utils.Java;
 import play.vfs.VirtualFile;
 
 import com.google.gson.JsonSerializer;
-import com.google.gson.reflect.TypeToken;
 import com.thoughtworks.xstream.XStream;
 import java.lang.reflect.Type;
 import org.apache.commons.javaflow.Continuation;
@@ -389,7 +388,7 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
     }
 
     /**
-     * Send a TODO response
+     * Send a todo response
      */
     protected static void todo() {
         notFound("This action has not been implemented Yet (" + request.action + ")");
@@ -602,6 +601,15 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
                 throw (PlayException) e;
             }
             throw new UnexpectedException(e);
+        }
+    }
+
+    protected static boolean templateExists(String templateName) {
+        try {
+            TemplateLoader.load(template(templateName));
+            return true;
+        } catch (TemplateNotFoundException ex) {
+            return false;
         }
     }
 
@@ -891,11 +899,12 @@ public class Controller implements ControllerSupport, LocalVariablesSupport {
         throw new Suspend(millis);
     }
 
+    @SuppressWarnings("unchecked")
     protected static <T> T await(Future<T> future) {
         if(future != null) {
             Request.current().args.put(ActionInvoker.F, future);
         } else if(Request.current().args.containsKey(ActionInvoker.F)) {
-            // Since the continiation will restart in this code that isn't intstrumented by javaflow,
+            // Since the continuation will restart in this code that isn't intstrumented by javaflow,
             // we need to reset the state manually.
             StackRecorder.get().isCapturing = false;
             StackRecorder.get().isRestoring = false;

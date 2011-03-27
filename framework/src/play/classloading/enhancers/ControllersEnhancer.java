@@ -14,9 +14,7 @@ import javassist.bytecode.annotation.Annotation;
 import javassist.expr.ExprEditor;
 import javassist.expr.FieldAccess;
 import javassist.expr.Handler;
-import org.apache.commons.javaflow.bytecode.transformation.asm.AsmClassTransformer;
 import play.Logger;
-import play.Play;
 import play.classloading.ApplicationClasses.ApplicationClass;
 import play.exceptions.UnexpectedException;
 
@@ -80,8 +78,8 @@ public class ControllersEnhancer extends Enhancer {
                 }
             }
 
-            // Patch for new scala module -->
-            if(Play.configuration.getProperty("scala.enableAutoRedirect", "true").equals("false") && Modifier.isPublic(ctMethod.getModifiers()) && ((ctClass.getName().endsWith("$") && !ctMethod.getName().contains("$default$"))) && !isHandler) {
+            // Auto redirect -->
+            if(!isScalaObject(ctClass) && Modifier.isPublic(ctMethod.getModifiers()) && ((ctClass.getName().endsWith("$") && !ctMethod.getName().contains("$default$"))) && !isHandler) {
 
                 try {
                     ctMethod.insertBefore(
@@ -118,7 +116,7 @@ public class ControllersEnhancer extends Enhancer {
 
                 @Override
                 public void edit(Handler handler) throws CannotCompileException {
-                    StringBuffer code = new StringBuffer();
+                    StringBuilder code = new StringBuilder();
                     try {
                         code.append("if($1 instanceof play.mvc.results.Result || $1 instanceof play.Invoker.Suspend) throw $1;");
                         handler.insertBefore(code.toString());
@@ -148,7 +146,7 @@ public class ControllersEnhancer extends Enhancer {
      * Check if a field must be translated to a 'thread safe field'
      */
     static boolean isThreadedFieldAccess(CtField field) {
-        if (field.getDeclaringClass().getName().equals("play.mvc.Controller") || field.getDeclaringClass().getName().equals("play.mvc.WebSocket")) {
+        if (field.getDeclaringClass().getName().equals("play.mvc.Controller") || field.getDeclaringClass().getName().equals("play.mvc.WebSocketController")) {
             return field.getName().equals("params")
                     || field.getName().equals("request")
                     || field.getName().equals("response")
@@ -198,8 +196,23 @@ public class ControllersEnhancer extends Enhancer {
         if(type.equals(CtClass.charType)) {
             return "return '';";
         }
-        if(type.equals(CtClass.byteType) || type.equals(CtClass.doubleType) || type.equals(CtClass.floatType) || type.equals(CtClass.intType) || type.equals(CtClass.longType) || type.equals(CtClass.shortType)) {
-            return "return 0;";
+        if(type.equals(CtClass.byteType)) {
+            return "return (byte)0;";
+        }
+        if(type.equals(CtClass.doubleType)) {
+            return "return (double)0;";
+        }
+        if(type.equals(CtClass.floatType)) {
+            return "return (float)0;";
+        }
+        if(type.equals(CtClass.intType)) {
+            return "return (int)0;";
+        }
+        if(type.equals(CtClass.longType)) {
+            return "return (long)0;";
+        }
+        if(type.equals(CtClass.shortType)) {
+            return "return (short)0;";
         }
         return "return null;";
     }

@@ -67,7 +67,13 @@ def getWithModules(args, env):
                 if os.path.isdir(os.path.join(env["basedir"], 'modules/%s' % f)) and f.find('%s-' % m) == 0:
                     dirname = os.path.join(env["basedir"], 'modules/%s' % f)
                     break
+        if not dirname:
+            print "~ Oops. Module " + m + " not found (try running `play install " + m + "`)"
+            print "~"
+            sys.exit(-1)
+        
         md.append(dirname)
+    
     return md
 
 def package_as_war(app, env, war_path, war_zip_path, war_exclusion_list = []):
@@ -184,6 +190,7 @@ def delete(filename):
     else:
         os.remove(filename)
 
+# Copy a directory, skipping dot-files
 def copy_directory(source, target, exclude = []):
     skip = None
 
@@ -212,3 +219,6 @@ def copy_directory(source, target, exclude = []):
             if not os.path.exists(to_directory):
                 os.makedirs(to_directory)
             shutil.copyfile(from_, to_)
+
+def isTestFrameworkId( framework_id ):
+    return (framework_id == 'test' or (framework_id.startswith('test-') and framework_id.__len__() >= 6 ))

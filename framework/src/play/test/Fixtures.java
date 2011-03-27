@@ -26,7 +26,6 @@ import org.yaml.snakeyaml.scanner.ScannerException;
 
 import play.Logger;
 import play.Play;
-import play.PlayPlugin;
 import play.classloading.ApplicationClasses;
 import play.data.binding.Binder;
 import play.data.binding.types.DateBinder;
@@ -35,6 +34,7 @@ import play.db.DBPlugin;
 import play.db.Model;
 import play.exceptions.UnexpectedException;
 import play.exceptions.YAMLException;
+import play.templates.TemplateLoader;
 import play.vfs.VirtualFile;
 
 public class Fixtures {
@@ -53,9 +53,7 @@ public class Fixtures {
             Model.Manager.factoryFor(type).deleteAll();
         }
         enableForeignKeyConstraints();
-        for(PlayPlugin plugin : Play.plugins) {
-            plugin.afterFixtureLoad();
-        }
+        Play.pluginCollection.afterFixtureLoad();
     }
 
     /**
@@ -109,14 +107,14 @@ public class Fixtures {
             disableForeignKeyConstraints();
             for (String name : names) {
                 if(Arrays.binarySearch(dontDeleteTheseTables, name) < 0) {
-                    Logger.trace("Dropping content of table %s", name);
+                    if (Logger.isTraceEnabled()) {
+                        Logger.trace("Dropping content of table %s", name);
+                    }
                     DB.execute(getDeleteTableStmt(name) + ";");
                 }
             }
             enableForeignKeyConstraints();
-            for(PlayPlugin plugin : Play.plugins) {
-                plugin.afterFixtureLoad();
-            }
+            Play.pluginCollection.afterFixtureLoad();
         } catch (Exception e) {
             throw new RuntimeException("Cannot delete all table data : " + e.getMessage(), e);
         }
@@ -146,12 +144,15 @@ public class Fixtures {
                     break;
                 }
             }
-            InputStream is = Play.classloader.getResourceAsStream(name);
-            if (is == null) {
+            if (yamlFile == null) {
                 throw new RuntimeException("Cannot load fixture " + name + ", the file was not found");
             }
+            
+            // Render yaml file with 
+            String renderedYaml = TemplateLoader.load(yamlFile).render();
+            
             Yaml yaml = new Yaml();
-            Object o = yaml.load(is);
+            Object o = yaml.load(renderedYaml);
             if (o instanceof LinkedHashMap<?, ?>) {
                 @SuppressWarnings("unchecked") LinkedHashMap<Object, Map<?, ?>> objects = (LinkedHashMap<Object, Map<?, ?>>) o;
                 for (Object key : objects.keySet()) {
@@ -175,11 +176,12 @@ public class Fixtures {
                         resolveDependencies(cType, params);
                         Model model = (Model)Binder.bind("object", cType, cType, null, params);
                         for(Field f : model.getClass().getFields()) {
-                            // TODO: handle something like FileAttachment
-                            if (f.getType().isAssignableFrom(Map.class)) {
+                            if (f.getType().isAssignableFrom(Map.class)) {	 	
                                 f.set(model, objects.get(key).get(f.getName()));
                             }
-
+                            if (f.getType().equals(byte[].class)) {
+                                f.set(model, objects.get(key).get(f.getName()));
+                            }
                         }
                         model._save();
                         Class<?> tType = cType;
@@ -191,9 +193,7 @@ public class Fixtures {
                 }
             }
             // Most persistence engine will need to clear their state
-            for(PlayPlugin plugin : Play.plugins) {
-                plugin.afterFixtureLoad();
-            }
+            Play.pluginCollection.afterFixtureLoad();
         } catch (ClassNotFoundException e) {
             throw new RuntimeException("Class " + e.getMessage() + " was not found", e);
         } catch (ScannerException e) {
@@ -260,12 +260,14 @@ public class Fixtures {
         return (Map<?,?>)loadYaml(name);
     }
 
+    @SuppressWarnings("unchecked")
     public static <T> T loadYaml(String name, Class<T> clazz) {
         Yaml yaml = new Yaml(new CustomClassLoaderConstructor(clazz, Play.classloader));
         yaml.setBeanAccess(BeanAccess.FIELD);
         return (T)loadYaml(name, yaml);
     }
 
+    @SuppressWarnings("unchecked")
     public static <T> T loadYaml(String name, Yaml yaml) {
         VirtualFile yamlFile = null;
         try {
