@@ -17,7 +17,7 @@ public class GroovyTemplateTest {
 
         String groovySrc = "hello world: ${name}";
 
-        GroovyTemplate t = new GroovyTemplate("Template_123", groovySrc);
+        GroovyTemplate t = (GroovyTemplate)TemplateEngine.engine.createTemplate("Template_123", groovySrc);
         new GroovyTemplateCompiler().compile(t);
 
         Map<String, Object> args = new HashMap<String,Object>();
@@ -44,7 +44,7 @@ public class GroovyTemplateTest {
         // make sure our test line is longer then maxPlainTextLength
         assertThat(groovySrc.length()).isGreaterThan( GroovyTemplateCompiler.maxPlainTextLength + 100);
 
-        GroovyTemplate t = new GroovyTemplate("Template_123", groovySrc);
+        GroovyTemplate t = (GroovyTemplate)TemplateEngine.engine.createTemplate("Template_123", groovySrc);
         new GroovyTemplateCompiler().compile(t);
 
         Map<String, Object> args = new HashMap<String,Object>();
@@ -85,7 +85,7 @@ public class GroovyTemplateTest {
         // make sure our test line is longer then maxPlainTextLength
         assertThat(groovySrc.length()).isGreaterThan( GroovyTemplateCompiler.maxPlainTextLength + 100);
 
-        GroovyTemplate t = new GroovyTemplate("Template_123", groovySrc);
+        GroovyTemplate t = (GroovyTemplate)TemplateEngine.engine.createTemplate("Template_123", groovySrc);
         new GroovyTemplateCompiler().compile(t);
 
         Map<String, Object> args = new HashMap<String,Object>();

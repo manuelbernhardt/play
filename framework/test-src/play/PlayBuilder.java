@@ -1,15 +1,15 @@
 package play;
 
 
-import play.classloading.ApplicationClasses;
-import play.classloading.ApplicationClassloader;
-import play.vfs.VirtualFile;
-
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Properties;
+
+import play.classloading.ApplicationClasses;
+import play.classloading.ApplicationClassloader;
+import play.templates.Play1TemplateEngine;
+import play.vfs.VirtualFile;
 
 /**
  * Builder-pattern-builder for Play-class..
@@ -36,6 +36,9 @@ public class PlayBuilder {
         Play.applicationPath = new File(".");
         Play.classloader = new ApplicationClassloader();
         Play.plugins = Collections.unmodifiableList( new ArrayList<PlayPlugin>());
+
+        Play.groovyTemplateEngine = new Play1TemplateEngine();
+        Play.groovyTemplateEngine.startup();
 
     }
 }

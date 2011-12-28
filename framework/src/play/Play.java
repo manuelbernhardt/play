@@ -21,6 +21,8 @@ import play.libs.IO;
 import play.mvc.Http;
 import play.mvc.Router;
 import play.plugins.PluginCollection;
+import play.templates.Play1TemplateEngine;
+import play.templates.TemplateEngine;
 import play.templates.TemplateLoader;
 import play.utils.OrderSafeProperties;
 import play.vfs.VirtualFile;
@@ -105,6 +107,10 @@ public class Play {
      * All paths to search for Java files
      */
     public static List<VirtualFile> javaPath;
+    /**
+     * A reference to the Groovy template engine
+     */
+    public static TemplateEngine groovyTemplateEngine;
     /**
      * All paths to search for templates files
      */
@@ -272,6 +278,10 @@ public class Play {
 
         // Load modules
         loadModules();
+
+        // Init groovy template engine
+        groovyTemplateEngine = new Play1TemplateEngine();
+        groovyTemplateEngine.startup();
 
         // Load the templates from the framework after the one from the modules
         templatesPath.add(VirtualFile.open(new File(frameworkPath, "framework/templates")));

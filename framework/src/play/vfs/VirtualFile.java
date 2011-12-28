@@ -20,11 +20,12 @@ import java.util.regex.Pattern;
 import play.Play;
 import play.exceptions.UnexpectedException;
 import play.libs.IO;
+import play.templates.PlayVirtualFile;
 
 /**
  * The VFS used by Play!
  */
-public class VirtualFile {
+public class VirtualFile implements PlayVirtualFile {
 
     File realFile;
 

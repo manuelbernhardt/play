@@ -12,6 +12,7 @@ import play.mvc.Http;
 import play.mvc.Router;
 import play.mvc.results.Result;
 import play.templates.BaseTemplate;
+import play.templates.PlayVirtualFile;
 import play.templates.Template;
 import play.test.BaseTest;
 import play.test.TestEngine;
@@ -664,9 +665,9 @@ public class PluginCollection {
         return source;
     }
 
-    public Template loadTemplate(VirtualFile file){
+    public Template loadTemplate(PlayVirtualFile file){
         for(PlayPlugin plugin : getEnabledPlugins() ) {
-            Template pluginProvided = plugin.loadTemplate(file);
+            Template pluginProvided = plugin.loadTemplate((VirtualFile)file);
             if(pluginProvided != null) {
                 return pluginProvided;
             }
