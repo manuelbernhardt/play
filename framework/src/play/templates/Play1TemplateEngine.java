@@ -28,11 +28,6 @@ public class Play1TemplateEngine extends TemplateEngine {
 
 
     @Override
-    protected TemplateEngine initEngineImplementation() {
-        return new Play1TemplateEngine();
-    }
-
-    @Override
     protected TemplateUtils initUtilsImplementation() {
         return new Play1TemplateUtils();
     }
