@@ -33,6 +33,11 @@ public class Play1TemplateEngine extends TemplateEngine {
     }
 
     @Override
+    public TemplateCompiler getTemplateCompiler() {
+        return new GroovyTemplateCompiler();
+    }
+
+    @Override
     public void handleException(Throwable t) {
         if(t instanceof TemplateEngineException) {
             handleException(t.getCause());
